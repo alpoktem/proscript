@@ -5,6 +5,7 @@ import json
 
 END = "<END>"
 COPY = "Prosograph"
+FLOAT_FORMATTING="{0:.4f}"
 
 class Word(object):
 	def __init__(self):
@@ -30,6 +31,8 @@ class Word(object):
 		self.i0_contour_semitones = []
 		self.f0_mean = 0.0
 		self.i0_mean = 0.0
+		self.f0_mean_hz = 0.0
+		self.i0_mean_db = 0.0
 		self.f0_slope = 0.0
 		self.i0_slope = 0.0
 		self.f0_median = 0.0
@@ -102,12 +105,8 @@ class Segment(object):
 
 	def to_string(self):
 		#print("segment id: %s"%self.id)
-		print("%s (%s): %.2f-%.2f"%(self.id, self.speaker_id, self.start_time, self.end_time))		
-		
-		transcript = ""
-		for word in self.word_list:
-			transcript += word.word + " "
-		print("transcript: %s"%transcript)
+		print("%s (%s): %.2f-%.2f"%(self.id, self.speaker_id, self.start_time, self.end_time))
+		print("transcript: %s"%self.transcript)
 
 	def get_value(self, property_name):
 		if hasattr(self, property_name):
@@ -149,6 +148,8 @@ class Proscript(object):
 		self.xml_file = ""
 		self.words_csv_path = ""
 		self.segments_csv_path = ""
+		self.speaker_f0_means = []
+		self.speaker_i0_means = []
 
 	def as_dict(self):
 		p_as_dict = {column:[] for column in ["word"] + self.word_feature_set}
@@ -156,6 +157,17 @@ class Proscript(object):
 			for key in p_as_dict:
 				p_as_dict[key].append(word.get_value(key))
 		return p_as_dict
+
+	def populate_speaker_ids(self):
+		for segment in self.segment_list:
+			if segment.speaker_id not in self.speaker_ids:
+				self.speaker_ids.append(segment.speaker_id)
+
+	def repopulate_word_list(self):
+		self.word_list = []
+		for segment in self.segment_list:
+			for word in segment.word_list:
+				self.word_list.append(word)
 
 	def get_speaker_textgrid_file(self, speaker_id):
 		index = self.speaker_ids.index(speaker_id)
@@ -169,6 +181,13 @@ class Proscript(object):
 	def get_last_segment(self):
 		if self.get_no_of_segments() > 0:
 			return self.segment_list[-1]
+		else:
+			return None
+
+	def get_value(self, property_name):
+		if hasattr(self, property_name):
+			value = getattr(self, property_name)
+			return value
 		else:
 			return None
 
@@ -234,17 +253,37 @@ class Proscript(object):
 		end_word.punctuation_before = punc_before
 		self.get_last_segment().add_word(end_word)
 
-	def get_speaker_means(self, feature):
-		speaker_mean_for_feature = {speaker_id:0.0 for speaker_id in self.speaker_ids}
-		for speaker_id in self.speaker_ids:
-			measurement_count = 0
-			for word in self.word_list:
-				for measurement in word.get_value(feature):
-					measurement_count += 1
-					speaker_mean_for_feature[speaker_id] += measurement
-			if measurement_count > 0:
-				speaker_mean_for_feature[speaker_id] /= measurement_count
-		return speaker_mean_for_feature
+	def get_speaker_means(self):
+		features = ['f0_mean_hz', 'i0_mean_db']
+		for feature_type in features:
+			speaker_mean_for_feature = {speaker_id:0.0 for speaker_id in self.speaker_ids}
+			for speaker_id in self.speaker_ids:
+				measurement_count = 0
+				for speaker_segment in self.get_speaker_segments(speaker_id):
+					for word in speaker_segment.word_list:
+						values = word.get_value(feature_type)
+						if not type(values) == list:
+							values = [values]
+						for measurement in values:
+							if measurement > 0.0:
+								measurement_count += 1
+								speaker_mean_for_feature[speaker_id] += measurement
+				if measurement_count > 0:
+					speaker_mean_for_feature[speaker_id] /= measurement_count
+					speaker_mean_for_feature[speaker_id] = float(FLOAT_FORMATTING.format(speaker_mean_for_feature[speaker_id]))
+				else:
+					if 'f0' in feature_type:
+						speaker_mean_for_feature[speaker_id] = 150 #An average value
+					elif 'i0' in feature_type:
+						speaker_mean_for_feature[speaker_id] = 55 #An average value
+
+			if 'f0' in feature_type:
+				self.speaker_f0_means = speaker_mean_for_feature	
+			elif 'i0' in feature_type:
+				self.speaker_i0_means = speaker_mean_for_feature	
+
+			print("%s speaker means"%self.id)
+			print("%s-%s speaker means:\n%s"%(self.id, feature_type, speaker_mean_for_feature))
 
 	def get_word_id_list(self):
 		word_id_list = []

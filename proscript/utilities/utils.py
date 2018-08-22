@@ -22,36 +22,112 @@ ENTRY_MERGE_LIMIT = 0.1
 FLOAT_FORMATTING="{0:.4f}"
 TIME_PRECISION = 3
 CONTOUR_BIN_NO=10
+DEFAULT_ACOUSTIC_FEATURE_VALUE = 0.0
 
 END = "<END>"
 
-#writes segment information in proscript to textgrid
-def proscript_segments_to_textgrid(proscript, output_dir, file_prefix="", speaker_segmented=False):
+#writes segment information in proscript to textgrid. If speaker_segmented is set, a separate textgrid is outputted for each speaker's segments. 
+def proscript_segments_to_textgrid(proscript, output_dir, file_prefix="", speaker_segmented=False, no_write=False):
 	output_files = []
-	assert proscript.duration > 0.0
-	for speaker_index, speaker_id in enumerate(proscript.speaker_ids):
-		tg = tgio.Textgrid()
+	assert (proscript.duration > 0.0, "Proscript duration is 0")
 
-		if speaker_segmented:
-			segment_entry_list = [(segment.start_time, segment.end_time, segment.transcript) for segment in proscript.get_speaker_segments(speaker_id)]
-		else:
-			segment_entry_list = [(segment.start_time, segment.end_time, segment.transcript) for segment in proscript.segment_list]
-		segment_tier = tgio.IntervalTier('%s'%speaker_id, segment_entry_list, 0, proscript.duration)
+	fix_segment_overlaps(proscript)
 
-		tg.addTier(segment_tier)
-
-		try:
-			textgrid_file = proscript.speaker_textgrid_files[speaker_index]
-		except:
-			if speaker_segmented:
+	if speaker_segmented:
+		proscript.populate_speaker_ids()
+		assert (len(proscript.speaker_ids) > 0, "No speaker info set on proscript")
+		for speaker_index, speaker_id in enumerate(proscript.speaker_ids):
+			try:
+				textgrid_file = proscript.speaker_textgrid_files[speaker_index]
+			except:
 				textgrid_file = os.path.join(output_dir, "%s-%s.TextGrid"%(file_prefix, speaker_id))
-			else:
-				textgrid_file = os.path.join(output_dir, "%s.TextGrid"%(file_prefix))
+			if not no_write:
+				tg = tgio.Textgrid()
+				segment_entry_list = [(segment.start_time, segment.end_time, segment.transcript) for segment in proscript.get_speaker_segments(speaker_id)]
+				segment_tier = tgio.IntervalTier('%s'%speaker_id, segment_entry_list, 0, proscript.duration)
+				tg.addTier(segment_tier)
+				saveTextGridWithTags(tg, textgrid_file)
+			output_files.append(textgrid_file)
+			proscript.speaker_textgrid_files.append(textgrid_file)
+	else:
+		if proscript.textgrid_file:
+			textgrid_file = proscript.textgrid_file
+		else:
+			textgrid_file = os.path.join(output_dir, "%s.TextGrid"%(file_prefix))
+			proscript.textgrid_file = textgrid_file
 
-		saveTextGridWithTags(tg, textgrid_file)
+		if not no_write:
+			tg = tgio.Textgrid()
+			segment_entry_list = [(segment.start_time, segment.end_time, segment.transcript) for segment in proscript.segment_list]
+			segment_tier = tgio.IntervalTier('segments', segment_entry_list, 0, proscript.duration)
+
+			tg.addTier(segment_tier)
+			saveTextGridWithTags(tg, textgrid_file)
 		output_files.append(textgrid_file)
-		proscript.speaker_textgrid_files.append(textgrid_file)
+	return output_files
 
+#writes segment information in proscript to textgrid. If speaker_segmented is set, a separate textgrid is outputted for each speaker's segments. 
+def proscript_to_textgrid(proscript, output_dir, file_prefix="", speaker_segmented=False, no_write=False):
+	output_files = []
+	assert (proscript.duration > 0.0, "Proscript duration is 0")
+
+	if file_prefix == "":
+		if not proscript.id == "":
+			file_prefix = proscript.id
+		else:
+			file_prefix = "textgrid"
+
+	if speaker_segmented:
+		proscript.populate_speaker_ids()
+		assert (len(proscript.speaker_ids) > 0, "No speaker info set on proscript")
+		for speaker_index, speaker_id in enumerate(proscript.speaker_ids):
+			try:
+				textgrid_file = proscript.speaker_textgrid_files[speaker_index]
+			except:
+				textgrid_file = os.path.join(output_dir, "%s-%s.TextGrid"%(file_prefix, speaker_id))
+			if not no_write:
+				tg = tgio.Textgrid()
+				segment_entry_list = [(segment.start_time, segment.end_time, segment.transcript) for segment in proscript.get_speaker_segments(speaker_id)]
+				segment_tier = tgio.IntervalTier('%s'%speaker_id, segment_entry_list, 0, proscript.duration)
+				tg.addTier(segment_tier)
+				saveTextGridWithTags(tg, textgrid_file)
+			output_files.append(textgrid_file)
+			proscript.speaker_textgrid_files.append(textgrid_file)
+	else:
+		if proscript.textgrid_file:
+			textgrid_file = proscript.textgrid_file
+		else:
+			textgrid_file = os.path.join(output_dir, "%s.TextGrid"%(file_prefix))
+			proscript.textgrid_file = textgrid_file
+
+		if not no_write:
+			tg = tgio.Textgrid()
+			segment_entry_list = [(segment.start_time, segment.end_time, segment.transcript) for segment in proscript.segment_list]
+			segment_tier = tgio.IntervalTier('segments', segment_entry_list, 0, proscript.duration)
+
+			word_entry_list = [(word.start_time, word.end_time, word.word) for word in proscript.word_list]
+			word_tier = tgio.IntervalTier('words', word_entry_list, 0, proscript.duration)
+
+			tg.addTier(segment_tier)
+			tg.addTier(word_tier)
+			saveTextGridWithTags(tg, textgrid_file)
+		output_files.append(textgrid_file)
+	return output_files
+
+def fix_segment_overlaps(proscript):
+	previous_segment = None
+	for segment_no in range(1, len(proscript.segment_list) - 1):
+		segment = proscript.segment_list[segment_no]
+		previous_segment = proscript.segment_list[segment_no - 1]
+		if previous_segment.end_time > segment.start_time:
+			print("In %s, segments %i and %i overlap."%(proscript.id, previous_segment.id, segment.id))
+			segment.to_string()
+			previous_segment.to_string()
+			previous_segment.end_time = segment.start_time
+
+'''
+Saves Textgrid ready to be read by Praat
+'''
 def saveTextGridWithTags(textgrid, fn, minimumIntervalLength=tgio.MIN_INTERVAL_LENGTH):
 	for tier in textgrid.tierDict.values():
 		tier.sort()
@@ -82,8 +158,8 @@ def saveTextGridWithTags(textgrid, fn, minimumIntervalLength=tgio.MIN_INTERVAL_L
 	with io.open(fn, "w") as fd:
 		fd.write(outputTxt)
 
+'''Prints each entry in the tier on a separate line w/ timing info'''
 def getTierAsTextWithTags(tier):
-	'''Prints each entry in the tier on a separate line w/ timing info'''
 	text = ""
 	text += '\t\tclass = "%s"\n' % tier.tierType
 	text += '\t\tname = "%s"\n' % tier.name
@@ -105,6 +181,9 @@ def getTierAsTextWithTags(tier):
 		text += "\t\t\t\ttext = %s\n" % unicodeFunc(entry[2])
 	return text
 
+'''
+return full path of the file with name and extension in the given path
+'''
 def find_file(name, extension, path):
 	filename = name + '.' + extension
 	for root, dirs, files in os.walk(path):
@@ -115,7 +194,6 @@ def find_file(name, extension, path):
 #Creates word/phoneme alignments in the textgrids in the input_textgrid_directory using Montreal Forced Aligner. 
 #Requirement: Input textgrids are already segmented into max 30 second intervals.
 #Warning: Replaces the input textgrids with word aligned textgrids.
-#TODO: work with lab files 
 def mfa_word_align(input_textgrid_directory, transcript_type="TextGrid", merge_textgrids=True, mfa_align_binary=None, lexicon=None, language_model=None, temp_dir=None):
 	#create a temporary output directory
 	if temp_dir == None:
@@ -276,24 +354,95 @@ def readTedDataToMemory(word_id_list, file_wordalign=None, file_wordaggs_f0=None
 
 #reads word alignment information from textgrid to proscript. 
 #punctuation information is filled wrt transcript info in segments
-#TODO: make this function work without speaker information
-def get_word_alignment_from_textgrid(proscript, word_tier_no=1, remove_textgrid=False):
-	#print("proscript: %s"%proscript.id)
-	for speaker_id in proscript.speaker_ids:
-		textgrid_file = proscript.get_speaker_textgrid_file(speaker_id)
+#OBSOLETE
+# def get_word_alignment_from_textgrid(proscript, word_tier_no=1, remove_textgrid=False):
+# 	#print("proscript: %s"%proscript.id)
+# 	for speaker_id in proscript.speaker_ids:
+# 		textgrid_file = proscript.get_speaker_textgrid_file(speaker_id)
+# 		textgrid = tgio.openTextgrid(textgrid_file)		#word segmented textgrid with three tiers, segment, word, phoneme
+# 		#print(textgrid.tierNameList[word_tier_no])
+# 		textgrid_wordtier = textgrid.tierDict[textgrid.tierNameList[word_tier_no]]
+# 		prev_segment = None
+# 		for segment in proscript.get_speaker_segments(speaker_id):
+# 			#print("(%s-%s)"%(segment.start_time, segment.end_time))
+# 			#print("segment %i :%s"%(segment.id, segment.transcript))
+# 			wordtier_segment = textgrid_wordtier.crop(segment.start_time, segment.end_time, mode='truncated', rebaseToZero=False)  #tier region corresponding to segment interval
+
+# 			transcript_tokens = segment.transcript.split()
+# 			if not len(wordtier_segment.entryList) == len(transcript_tokens):
+# 				#print('TextGrid, transcript mismatch @segment %i :%s'%(segment.id, segment.transcript))
+# 				pass
+# 			tier_entry_index = 0
+# 			for token in transcript_tokens:
+# 				#print("token: %s"%token)
+# 				if token == '-':
+# 					segment.needs_split_at.append(tier_entry_index)
+# 				elif tier_entry_index < len(wordtier_segment.entryList):
+# 					#print(wordtier_segment.entryList[tier_entry_index])
+# 					word = Word()
+# 					word.start_time = round(wordtier_segment.entryList[tier_entry_index][0], TIME_PRECISION)
+# 					word.end_time = round(wordtier_segment.entryList[tier_entry_index][1], TIME_PRECISION)
+# 					word.duration = round(word.end_time - word.start_time, TIME_PRECISION)
+
+# 					if segment.get_last_word():
+# 						word.pause_before = round(word.start_time - segment.get_last_word().end_time, TIME_PRECISION)
+# 						segment.get_last_word().pause_after = word.pause_before
+# 					elif prev_segment and prev_segment.get_last_word():
+# 						word.pause_before = round(word.start_time - prev_segment.get_last_word().end_time, TIME_PRECISION)
+# 						prev_segment.get_last_word().pause_after = word.pause_before
+# 					else:
+# 						word.pause_before = 0.0
+
+# 					word.word = wordtier_segment.entryList[tier_entry_index][2]
+# 					if word.word == "<unk>":
+# 						word.word = token.lower()
+
+# 					word_in_token_search_beginning = re.search(r'\w+', token)
+# 					word_in_token_search_end = re.search(r'\w+', token[::-1])
+					
+# 					try:
+# 						word.punctuation_before = token[:word_in_token_search_beginning.start()]
+# 						word.punctuation_after = token[::-1][:word_in_token_search_end.start()][::-1]
+# 					except:
+# 						pass
+# 					#print("puncs: |%s| - |%s|"%(word.punctuation_before, word.punctuation_after))
+# 					segment.add_word(word)
+# 					tier_entry_index += 1
+# 					#print("add_word")
+# 					#print("----------------")
+# 			prev_segment = segment
+# 		if remove_textgrid:
+# 			os.remove(textgrid_file)
+
+#reads word alignment information and acoustic metadata from textgrid to proscript. 
+#punctuation information is filled wrt transcript info in segments
+def get_word_features_from_textgrid(proscript, word_tier_no=1, remove_textgrid=False, prosody_tag=False, praat_binary='praat'):
+	if proscript.speaker_textgrid_files:
+		segment_lists = [proscript.get_speaker_segments(speaker_id) for speaker_id in proscript.speaker_ids]
+		textgrid_files = [proscript.get_speaker_textgrid_file(speaker_id) for speaker_id in proscript.speaker_ids]
+	elif proscript.textgrid_file:
+		segment_lists = [proscript.segment_list]
+		textgrid_files = [proscript.textgrid_file]
+
+	for textgrid_file, segment_list in zip(textgrid_files, segment_lists):
+		if prosody_tag:
+			file_id = os.path.splitext(os.path.basename(textgrid_file))[0]
+			working_dir = os.path.dirname(os.path.abspath(textgrid_file))
+			call_prosody_tagger(praat_binary, file_id, working_dir)
+
 		textgrid = tgio.openTextgrid(textgrid_file)		#word segmented textgrid with three tiers, segment, word, phoneme
 		#print(textgrid.tierNameList[word_tier_no])
 		textgrid_wordtier = textgrid.tierDict[textgrid.tierNameList[word_tier_no]]
 		prev_segment = None
-		for segment in proscript.get_speaker_segments(speaker_id):
+		for segment in segment_list:
 			#print("(%s-%s)"%(segment.start_time, segment.end_time))
 			#print("segment %i :%s"%(segment.id, segment.transcript))
 			wordtier_segment = textgrid_wordtier.crop(segment.start_time, segment.end_time, mode='truncated', rebaseToZero=False)  #tier region corresponding to segment interval
 
 			transcript_tokens = segment.transcript.split()
-			if not len(wordtier_segment.entryList) == len(transcript_tokens):
-				#print('TextGrid, transcript mismatch @segment %i :%s'%(segment.id, segment.transcript))
-				pass
+			# if not len(wordtier_segment.entryList) == len(transcript_tokens):
+			# 	#print('TextGrid, transcript mismatch @segment %i (%i) :%s'%(segment.id, segment.start_time, segment.transcript))
+			# 	pass
 			tier_entry_index = 0
 			for token in transcript_tokens:
 				#print("token: %s"%token)
@@ -308,36 +457,80 @@ def get_word_alignment_from_textgrid(proscript, word_tier_no=1, remove_textgrid=
 
 					if segment.get_last_word():
 						word.pause_before = round(word.start_time - segment.get_last_word().end_time, TIME_PRECISION)
+						segment.get_last_word().pause_after = word.pause_before
 					elif prev_segment and prev_segment.get_last_word():
 						word.pause_before = round(word.start_time - prev_segment.get_last_word().end_time, TIME_PRECISION)
+						prev_segment.get_last_word().pause_after = word.pause_before
 					else:
 						word.pause_before = 0.0
 
-					word.word = wordtier_segment.entryList[tier_entry_index][2]
-					if word.word == "<unk>":
-						word.word = token.lower()
-
+					word_info = wordtier_segment.entryList[tier_entry_index][2]
+					word_word = word_info.split('@')[0]
+					
+					#Get punctuation info
 					word_in_token_search_beginning = re.search(r'\w+', token)
 					word_in_token_search_end = re.search(r'\w+', token[::-1])
 					
 					try:
 						word.punctuation_before = token[:word_in_token_search_beginning.start()]
-						word.punctuation_after = token[::-1][:word_in_token_search_end.start()][::-1]
 					except:
 						pass
 
+					try:
+						word.punctuation_after = token[::-1][:word_in_token_search_end.start()][::-1]
+					except:
+						pass
 					#print("puncs: |%s| - |%s|"%(word.punctuation_before, word.punctuation_after))
 
+					#Get word
+					if word_word == "<unk>":
+						try:
+							word.word = token[word_in_token_search_beginning.start() : len(token) - word_in_token_search_end.start()].lower()
+						except:
+							print("Weird token: %s (%s)"%(token, word.start_time))
+							continue
+					else:
+						word.word = word_word
+
+					#Get acoustic annotations from tags in textgrid
+					try:
+						word_features = word_info.split('@')[1]
+						parse_features_to_word(word, word_features)
+					except:
+						print("Error parsing features to word")
+						pass
 					segment.add_word(word)
 					tier_entry_index += 1
-					#print("add_word")
-					#print("----------------")
 			prev_segment = segment
 		if remove_textgrid:
 			os.remove(textgrid_file)
 
+'''
+assigns f0 and i0 means of each word
+'''
+def assign_acoustic_means(proscript):
+	for segment in proscript.segment_list:
+		speaker_id = segment.speaker_id
+		for word in segment.word_list:
+			word.f0_mean = float(FLOAT_FORMATTING.format(to_semitone(word.f0_mean_hz, proscript.speaker_f0_means[speaker_id]))) if word.f0_mean_hz > 0 else 0.0
+			word.i0_mean = float(FLOAT_FORMATTING.format(to_semitone(word.i0_mean_db, proscript.speaker_i0_means[speaker_id]))) if word.i0_mean_db > 0 else 0.0
+
+'''
+Used for parsing the word acoustic metadata in textgrid to attributes of a word
+'''
+def parse_features_to_word(word, word_features):
+	feature_entries = [entry.strip() for entry in word_features[word_features.find("{")+1:word_features.find("}")].split(',')]
+	feature_ids = [entry.split(':')[0] for entry in feature_entries]
+	feature_values = [entry.split(':')[1] for entry in feature_entries]
+
+	for feature_id, value in zip(feature_ids, feature_values):
+		if not value == '--undefined--':
+			word.set_value(feature_id, value, given_as_string = True)
+		else:
+			word.set_value(feature_id, DEFAULT_ACOUSTIC_FEATURE_VALUE)
+
 #calls praat scripts under the package directory. Make sure they're accessible. 
-def laic_call(file_id, wavfile, alignfile, working_dir, get_aggs=True):
+def laic_call(file_id, wavfile, alignfile, working_dir, get_aggs=False):
 	if get_aggs:
 		command = "%s/laic/extract-prosodic-feats.sh %s %s %s %s"%(os.path.dirname(os.path.realpath(__file__)), file_id, wavfile, alignfile, working_dir)
 	else:
@@ -347,7 +540,27 @@ def laic_call(file_id, wavfile, alignfile, working_dir, get_aggs=True):
 		p = subprocess.Popen(command.split())
 		p.communicate()
 
-def assign_acoustic_feats(proscript, working_dir=None, get_aggs=True):
+'''
+Calls prosody tagger residing in package directory. Needs a working binary of Praat. 
+Textgrid and wav file should be in the working directory with same basename. Output on same textgrid.
+'''
+def call_prosody_tagger(praat_binary, file_id, working_dir):
+	command = "%s %s/praat/prosody_tagger.praat %s %s"%(praat_binary, os.path.dirname(os.path.realpath(__file__)), working_dir, file_id)
+	print("Prosody tagger call: %s"%command)
+	with open(os.devnull, 'w') as fp:
+		p = subprocess.Popen(command.split())
+		p.communicate()
+
+'''
+OBSOLETE: Assigns acoustic features with laic's library
+'''
+def assign_acoustic_feats(proscript, working_dir=None, get_aggs=False):
+	if not os.path.exists(proscript.audio_file):
+		print("Proscript audio file doesn't exist or not set")
+		return -1
+	if not proscript.id:
+		proscript.id = "proscript"
+
 	if working_dir == None:
 		working_dir = tempfile.mkdtemp()
 	elif not os.path.exists(working_dir):
@@ -413,10 +626,10 @@ def assign_acoustic_feats(proscript, working_dir=None, get_aggs=True):
 			except:
 				print("No i0 contour for %s"%word_id)
 	
-	speaker_f0_means = proscript.get_speaker_means("f0_contour")
+	speaker_f0_means = proscript.get_speaker_means("f0_contour", 'f0')
 	print("speaker f0 mean")
 	print(speaker_f0_means)
-	speaker_i0_means = proscript.get_speaker_means("i0_contour")
+	speaker_i0_means = proscript.get_speaker_means("i0_contour", 'i0')
 
 	for segment in proscript.segment_list:
 		speaker_id = segment.speaker_id
@@ -437,23 +650,18 @@ def assign_acoustic_feats(proscript, working_dir=None, get_aggs=True):
 				word.f0_range = f0_max - f0_min
 				word.i0_range = i0_max - i0_min
 
-			#print("-----")
-			#print(word.word)
-			# print("raw mean")
-			# raw_mean=np.mean(word.f0_contour)
-			# print(raw_mean)
-			# print("interpolated mean")
-			# mean = np.mean(word.f0_contour_evened)
-			# print(mean)
-			# print("semitone mean from calculated semitone contour")
-			# print(np.mean(word.f0_contour_semitones))
-			# print("semitone mean from calculated interpolated contour")
-			# print(to_semitone(mean, speaker_f0_means[speaker_id]))
-			# print("semitone mean from raw contour")
-			# print(to_semitone(raw_mean, speaker_f0_means[speaker_id]))  #bunu mean'e koy
-			# print("semitone mean from R scripts")
-			# print(word.f0_mean)
-
+'''
+Subtracts the segment start time from times of words in the segment 
+'''
+def reset_segment_times(segment, reset_beginning_end=False):
+	for index, word in enumerate(segment.word_list):
+		if reset_beginning_end:
+			if index == 0:
+				word.pause_before = 0.0
+			if index == len(segment.word_list) - 1:
+				word.pause_after = 0.0
+		word.start_time = float(FLOAT_FORMATTING.format(word.start_time - segment.start_time))
+		word.end_time = float(FLOAT_FORMATTING.format(word.end_time - segment.start_time))
 
 def to_semitone(f,ref):
 	return math.log((f/ref), 2) * 12
