@@ -742,6 +742,7 @@ def read_proscript_as_dict(filename, delimiter="|"):
 						proscript[k].append(0.0)
 	return proscript
 
+#returns transcript of the given element, word, segment or proscript
 def get_transcript(element):
 	if type(element) == Word:
 		return word.word
