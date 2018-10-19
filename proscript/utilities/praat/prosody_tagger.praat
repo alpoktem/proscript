@@ -42,7 +42,7 @@ selectObject: sound$
 To Intensity: 100, 0, "yes"
 # Create Pitch object
 selectObject: sound$
-To Pitch: 0, 75, 300
+To Pitch: 0, 20, 700
 
 
 selectObject: text$

@@ -209,6 +209,8 @@ def mfa_word_align(input_textgrid_directory, transcript_type="TextGrid", merge_t
 	print("Sending Textgrids to Montreal Forced Aligner")
 
 	command = "%s %s %s %s %s"%(mfa_align_binary, input_textgrid_directory, lexicon, language_model, temp_dir)
+
+	print(command)
 	p = subprocess.Popen(command.split())
 	p.communicate()
 
