@@ -12,9 +12,11 @@ class Word(object):
 		self.id = ""
 		self.word = None
 		#timing parameters
-		self.duration = 0.0				#seconds
-		self.end_time = 0.0				#seconds
+		self.duration = 0.0				    #seconds
+		self.end_time = 0.0					#seconds
 		self.start_time = 0.0				#seconds
+		self.real_end_time = 0.0			#seconds
+		self.real_start_time = 0.0			#seconds
 		self.pause_before = 0.0  			#seconds
 		self.pause_after = 0.0				#seconds
 		#speech rate parameters
@@ -312,9 +314,14 @@ class Proscript(object):
 		with open(csv_filename) as f:
 			reader = csv.DictReader(f, delimiter=delimiter) # read rows into a dictionary format
 
+			row_count = 0
 			curr_seg = Segment()
 			for row in reader: # read a row as {column1: value1, column2: value2,...}
-				word_id = row["id"]
+				row_count += 1
+				try:
+					word_id = row["id"]
+				except:
+					word_id = "%s.seg0.word%i"%(self.id, row_count)
 				segment_id = word_id.split('.')[1]
 				segment_id = segment_id.replace('segment', '')
 				try:	
@@ -355,9 +362,13 @@ class Proscript(object):
 
 		curr_seg = Segment()
 		for index in range(no_of_words): 
-			word_id = proscript_as_dict["id"][index]
-			segment_id = word_id.split('.')[1]
-			segment_id = segment_id.replace('segment', '')
+			try:
+				word_id = proscript_as_dict["id"][index]
+				segment_id = word_id.split('.')[1]
+				segment_id = segment_id.replace('segment', '')
+			except:
+				word_id = 'w0'
+				segment_id = 's0'
 			try:	
 				spk_id = proscript_as_dict["spk_id"][index]
 				if not spk_id in self.speaker_ids:

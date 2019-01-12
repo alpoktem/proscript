@@ -349,72 +349,9 @@ def readTedDataToMemory(word_id_list, file_wordalign=None, file_wordaggs_f0=None
 							elif row_count == 6:
 								line_type = 1	
 
-	
 	print("=========love=========")
 
 	return [word_id_to_f0_features_dic, word_id_to_i0_features_dic, word_data_aligned_dic, word_id_to_raw_f0_features_dic, word_id_to_raw_i0_features_dic]
-
-#reads word alignment information from textgrid to proscript. 
-#punctuation information is filled wrt transcript info in segments
-#OBSOLETE
-# def get_word_alignment_from_textgrid(proscript, word_tier_no=1, remove_textgrid=False):
-# 	#print("proscript: %s"%proscript.id)
-# 	for speaker_id in proscript.speaker_ids:
-# 		textgrid_file = proscript.get_speaker_textgrid_file(speaker_id)
-# 		textgrid = tgio.openTextgrid(textgrid_file)		#word segmented textgrid with three tiers, segment, word, phoneme
-# 		#print(textgrid.tierNameList[word_tier_no])
-# 		textgrid_wordtier = textgrid.tierDict[textgrid.tierNameList[word_tier_no]]
-# 		prev_segment = None
-# 		for segment in proscript.get_speaker_segments(speaker_id):
-# 			#print("(%s-%s)"%(segment.start_time, segment.end_time))
-# 			#print("segment %i :%s"%(segment.id, segment.transcript))
-# 			wordtier_segment = textgrid_wordtier.crop(segment.start_time, segment.end_time, mode='truncated', rebaseToZero=False)  #tier region corresponding to segment interval
-
-# 			transcript_tokens = segment.transcript.split()
-# 			if not len(wordtier_segment.entryList) == len(transcript_tokens):
-# 				#print('TextGrid, transcript mismatch @segment %i :%s'%(segment.id, segment.transcript))
-# 				pass
-# 			tier_entry_index = 0
-# 			for token in transcript_tokens:
-# 				#print("token: %s"%token)
-# 				if token == '-':
-# 					segment.needs_split_at.append(tier_entry_index)
-# 				elif tier_entry_index < len(wordtier_segment.entryList):
-# 					#print(wordtier_segment.entryList[tier_entry_index])
-# 					word = Word()
-# 					word.start_time = round(wordtier_segment.entryList[tier_entry_index][0], TIME_PRECISION)
-# 					word.end_time = round(wordtier_segment.entryList[tier_entry_index][1], TIME_PRECISION)
-# 					word.duration = round(word.end_time - word.start_time, TIME_PRECISION)
-
-# 					if segment.get_last_word():
-# 						word.pause_before = round(word.start_time - segment.get_last_word().end_time, TIME_PRECISION)
-# 						segment.get_last_word().pause_after = word.pause_before
-# 					elif prev_segment and prev_segment.get_last_word():
-# 						word.pause_before = round(word.start_time - prev_segment.get_last_word().end_time, TIME_PRECISION)
-# 						prev_segment.get_last_word().pause_after = word.pause_before
-# 					else:
-# 						word.pause_before = 0.0
-
-# 					word.word = wordtier_segment.entryList[tier_entry_index][2]
-# 					if word.word == "<unk>":
-# 						word.word = token.lower()
-
-# 					word_in_token_search_beginning = re.search(r'\w+', token)
-# 					word_in_token_search_end = re.search(r'\w+', token[::-1])
-					
-# 					try:
-# 						word.punctuation_before = token[:word_in_token_search_beginning.start()]
-# 						word.punctuation_after = token[::-1][:word_in_token_search_end.start()][::-1]
-# 					except:
-# 						pass
-# 					#print("puncs: |%s| - |%s|"%(word.punctuation_before, word.punctuation_after))
-# 					segment.add_word(word)
-# 					tier_entry_index += 1
-# 					#print("add_word")
-# 					#print("----------------")
-# 			prev_segment = segment
-# 		if remove_textgrid:
-# 			os.remove(textgrid_file)
 
 #reads word alignment information and acoustic metadata from textgrid to proscript. 
 #punctuation information is filled wrt transcript info in segments
@@ -456,6 +393,7 @@ def get_word_features_from_textgrid(proscript, word_tier_no=1, remove_textgrid=F
 					word.start_time = round(wordtier_segment.entryList[tier_entry_index][0], TIME_PRECISION)
 					word.end_time = round(wordtier_segment.entryList[tier_entry_index][1], TIME_PRECISION)
 					word.duration = round(word.end_time - word.start_time, TIME_PRECISION)
+
 
 					if segment.get_last_word():
 						word.pause_before = round(word.start_time - segment.get_last_word().end_time, TIME_PRECISION)
@@ -653,15 +591,19 @@ def assign_acoustic_feats(proscript, working_dir=None, get_aggs=False):
 				word.i0_range = i0_max - i0_min
 
 '''
-Subtracts the segment start time from times of words in the segment 
+Changes start/end time of the words to their relative timings within the segment by subtracting segment start time. Old values are stored as read_start/end_time
 '''
-def reset_segment_times(segment, reset_beginning_end=False):
+def reset_segment_times(segment, reset_pause_at_beginning_end=False):
 	for index, word in enumerate(segment.word_list):
-		if reset_beginning_end:
+		if reset_pause_at_beginning_end:
 			if index == 0:
 				word.pause_before = 0.0
 			if index == len(segment.word_list) - 1:
 				word.pause_after = 0.0
+
+		word.real_start_time = word.start_time
+		word.real_end_time = word.end_time
+		
 		word.start_time = float(FLOAT_FORMATTING.format(word.start_time - segment.start_time))
 		word.end_time = float(FLOAT_FORMATTING.format(word.end_time - segment.start_time))
 
