@@ -13,8 +13,6 @@ from proscript import Word
 from proscript import Proscript
 from proscript import Segment
 from collections import OrderedDict
-import numpy as np
-import nltk
 from shutil import copyfile
 
 ENTRY_MERGE_LIMIT = 0.1
@@ -128,7 +126,7 @@ def fix_segment_overlaps(proscript):
 '''
 Saves Textgrid ready to be read by Praat
 '''
-def saveTextGridWithTags(textgrid, fn, minimumIntervalLength=tgio.MIN_INTERVAL_LENGTH):
+def saveTextGridWithTags(textgrid, fn, minimumIntervalLength=None):
 	for tier in textgrid.tierDict.values():
 		tier.sort()
 	# Fill in the blank spaces for interval tiers
@@ -138,6 +136,8 @@ def saveTextGridWithTags(textgrid, fn, minimumIntervalLength=tgio.MIN_INTERVAL_L
 			tier = tgio._fillInBlanks(tier, "", textgrid.minTimestamp, textgrid.maxTimestamp)
 		if minimumIntervalLength is not None:
 			tier = tgio._removeUltrashortIntervals(tier, minimumIntervalLength)
+		else:
+			tier = tgio._removeUltrashortIntervals(tier, tgio.MIN_INTERVAL_LENGTH)
 		textgrid.tierDict[name] = tier
 
 	for tier in textgrid.tierDict.values():
@@ -491,104 +491,6 @@ def call_prosody_tagger(praat_binary, file_id, working_dir):
 		p = subprocess.Popen(command.split())
 		p.communicate()
 
-'''
-OBSOLETE: Assigns acoustic features with laic's library
-'''
-def assign_acoustic_feats(proscript, working_dir=None, get_aggs=False):
-	if not os.path.exists(proscript.audio_file):
-		print("Proscript audio file doesn't exist or not set")
-		return -1
-	if not proscript.id:
-		proscript.id = "proscript"
-
-	if working_dir == None:
-		working_dir = tempfile.mkdtemp()
-	elif not os.path.exists(working_dir):
-		os.makedirs(working_dir)
-	
-	alignment_file = os.path.join(working_dir, "%s_alignment.csv"%proscript.id)
-	proscript_to_alignfile(proscript, alignment_file)
-
-	laic_call(proscript.id, proscript.audio_file, alignment_file, working_dir, get_aggs)
-
-	if get_aggs:
-		file_wordaggs_f0 = os.path.join(working_dir, "f0", "%s.aggs.txt"%proscript.id)
-		file_wordaggs_i0 = os.path.join(working_dir, "i0", "%s.aggs.txt"%proscript.id)
-	dir_raw_f0 = os.path.join(working_dir, "raw-f0")
-	dir_raw_i0  = os.path.join(working_dir, "raw-i0")
-
-	word_id_list = proscript.get_word_id_list()
-
-	if get_aggs:
-		[word_id_to_f0_features_dic, word_id_to_i0_features_dic, word_data_aligned_dic, word_id_to_raw_f0_features_dic, word_id_to_raw_i0_features_dic] = readTedDataToMemory(word_id_list=word_id_list, file_wordalign=alignment_file, file_wordaggs_f0=file_wordaggs_f0, file_wordaggs_i0=file_wordaggs_i0, dir_raw_f0=dir_raw_f0, dir_raw_i0=dir_raw_i0)
-	else:
-		[_, _, _, word_id_to_raw_f0_features_dic, word_id_to_raw_i0_features_dic] = readTedDataToMemory(word_id_list=word_id_list, dir_raw_f0=dir_raw_f0, dir_raw_i0=dir_raw_i0)
-
-	for segment in proscript.segment_list:
-		for word in segment.word_list:
-			word_id = word.id
-
-			#acoustic features
-			if get_aggs:
-				try:
-					word.f0_mean = float(FLOAT_FORMATTING.format(word_id_to_f0_features_dic[word_id][0]))
-					word.f0_slope = float(FLOAT_FORMATTING.format(word_id_to_f0_features_dic[word_id][14]))
-					word.f0_sd = float(FLOAT_FORMATTING.format(word_id_to_f0_features_dic[word_id][1]))
-					word.f0_range = float(FLOAT_FORMATTING.format(float(word_id_to_f0_features_dic[word_id][2]) - float(word_id_to_f0_features_dic[word_id][3])))
-				except:
-					print("No f0 features for %s"%word_id)
-				try:
-					word.i0_mean = float(FLOAT_FORMATTING.format(word_id_to_i0_features_dic[word_id][0]))
-					word.i0_slope = float(FLOAT_FORMATTING.format(word_id_to_i0_features_dic[word_id][14]))
-					word.i0_sd = float(FLOAT_FORMATTING.format(word_id_to_i0_features_dic[word_id][1]))
-					word.i0_range = float(FLOAT_FORMATTING.format(float(word_id_to_i0_features_dic[word_id][2]) - float(word_id_to_i0_features_dic[word_id][3])))
-				except:
-					print("No i0 features for %s"%word_id)
-
-			#contours
-			try:
-				f0_contour = np.array(word_id_to_raw_f0_features_dic[word_id])  #this is two dimensional
-				word.f0_contour_xaxis = f0_contour[:,0].tolist() if f0_contour.size else []
-				word.f0_contour = f0_contour[:,1].tolist() if f0_contour.size else []
-				interpolated_contour = np.interp(np.arange(100), word.f0_contour_xaxis, word.f0_contour)
-				word.f0_contour_evened = interpolated_contour.tolist() if len(interpolated_contour) else [0] * 100  #bunu bin'le
-				#word.f0_contour_evened = interpolated_contour[0::CONTOUR_BIN_NO].tolist() if f0_contour.size else [0] * CONTOUR_BIN_NO	#rename contour_bin_no variable
-			except:
-				print("No f0 contour for %s"%word_id)
-			
-			try:
-				i0_contour = np.array(word_id_to_raw_i0_features_dic[word_id])  #this is two dimensional
-				word.i0_contour_xaxis = i0_contour[:,0].tolist() if i0_contour.size else []
-				word.i0_contour = i0_contour[:,1].tolist() if i0_contour.size else []
-				interpolated_contour = np.interp(np.arange(100), word.i0_contour_xaxis, word.i0_contour)
-				word.i0_contour_evened = interpolated_contour.tolist() if len(interpolated_contour) else [0] * 100 #bunu bin'le
-				#word.i0_contour_evened = interpolated_contour[0::CONTOUR_BIN_NO].tolist() if i0_contour.size else [0] * CONTOUR_BIN_NO
-			except:
-				print("No i0 contour for %s"%word_id)
-	
-	speaker_f0_means = proscript.get_speaker_means("f0_contour", 'f0')
-	print("speaker f0 mean")
-	print(speaker_f0_means)
-	speaker_i0_means = proscript.get_speaker_means("i0_contour", 'i0')
-
-	for segment in proscript.segment_list:
-		speaker_id = segment.speaker_id
-		for word in segment.word_list:
-			word.f0_contour_semitones = [to_semitone(f, speaker_f0_means[speaker_id]) for f in word.f0_contour_evened]
-			word.i0_contour_semitones = [to_semitone(f, speaker_i0_means[speaker_id]) for f in word.i0_contour_evened]
-
-			if not get_aggs:
-				f0_mean = to_semitone(np.mean(word.f0_contour), speaker_f0_means[speaker_id]) if len(word.f0_contour) > 0 else 0.0
-				i0_mean = to_semitone(np.mean(word.i0_contour), speaker_i0_means[speaker_id]) if len(word.i0_contour) > 0 else 0.0
-				f0_max = to_semitone(max(word.f0_contour), speaker_f0_means[speaker_id]) if len(word.f0_contour) > 0 else 0.0
-				f0_min = to_semitone(min(word.f0_contour), speaker_f0_means[speaker_id]) if len(word.f0_contour) > 0 else 0.0
-				i0_max = to_semitone(max(word.i0_contour), speaker_i0_means[speaker_id]) if len(word.i0_contour) > 0 else 0.0
-				i0_min = to_semitone(min(word.i0_contour), speaker_i0_means[speaker_id]) if len(word.i0_contour) > 0 else 0.0
-
-				word.f0_mean = f0_mean
-				word.i0_mean = i0_mean
-				word.f0_range = f0_max - f0_min
-				word.i0_range = i0_max - i0_min
 
 '''
 Changes start/end time of the words to their relative timings within the segment by subtracting segment start time. Old values are stored as read_start/end_time
@@ -642,6 +544,7 @@ def proscript_to_alignfile(proscript, alignfile_filename):
 					sid += 1
 
 def assign_pos_tags(segment):
+	import nltk
 	tokens = [word.word for word in segment.word_list]
 	pos_data = nltk.pos_tag(tokens)
 
