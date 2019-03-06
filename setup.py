@@ -9,7 +9,7 @@ setup(name='proscript',
       author_email='alp.oktem@upf.edu',
       packages=find_packages(),
       include_package_data=True,
-      package_data = {'proscript': ['utilities/laic/*', 'utilities/praat/*']},
+      package_data = {'proscript': ['utilities/praat/*']},
 	  entry_points = {
         'console_scripts': ['proscripter=proscript.scripts:main'],
     	}
