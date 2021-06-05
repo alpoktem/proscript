@@ -135,9 +135,9 @@ def saveTextGridWithTags(textgrid, fn, minimumIntervalLength=None):
 		if isinstance(tier, tgio.IntervalTier):
 			tier = tgio._fillInBlanks(tier, "", textgrid.minTimestamp, textgrid.maxTimestamp)
 		if minimumIntervalLength is not None:
-			tier = tgio._removeUltrashortIntervals(tier, minimumIntervalLength)
+			tier = tgio._removeUltrashortIntervals(tier, minimumIntervalLength, tier.minTimestamp)
 		else:
-			tier = tgio._removeUltrashortIntervals(tier, tgio.MIN_INTERVAL_LENGTH)
+			tier = tgio._removeUltrashortIntervals(tier, tgio.MIN_INTERVAL_LENGTH, tier.minTimestamp)
 		textgrid.tierDict[name] = tier
 
 	for tier in textgrid.tierDict.values():

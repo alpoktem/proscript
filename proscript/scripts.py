@@ -9,7 +9,6 @@ import argparse
 import sys
 import json
 import os
-import speech_recognition as sr
 from proscript import Word, Segment, Proscript
 #from utilities import utils #FOR DEVELOPMENT
 from proscript.utilities import utils
@@ -23,6 +22,10 @@ DEFAULT_CSV_OUTPUT_FILENAME = "recording_proscript.csv"
 #other parameters
 DEFAULT_SEGMENT_END_BUFFER = 0.15
 
+MFA_ALIGN_BINARY = os.getenv('MFA_ALIGN_BINARY')
+MFA_LEXICON = os.getenv('MFA_LEXICON')
+MFA_LM = os.getenv('MFA_LM') 
+
 #ISSUE 1: MFA processes all audio in the directory of the audio file. 
 #ISSUE 2: If audio is in another location, textgrid is placed there, not on working dir 
 
@@ -30,31 +33,38 @@ def main():
 	parser = argparse.ArgumentParser(prog='PROG')
 	group = parser.add_mutually_exclusive_group()
 	group.add_argument("-r", "--recognize_audio", action='store_true')
+	group.add_argument("-x", "--recognize_audio_google", action='store_true')
 	group.add_argument("-s", "--process_shortaudio", action='store_true')
 	group.add_argument("-l", "--process_longaudio", action='store_true')
 	parser.add_argument('-a', action="store", dest="audio_path")
 	parser.add_argument('-c', action="store", dest="credentials_path")
 	parser.add_argument('-t', action="store", dest="transcript_path")
 	parser.add_argument('-g', action="store", dest="textgrid_path")
-	parser.add_argument('-p', action="store", dest="pathsfile_path")
 
 	args = parser.parse_args()
 
+	if not MFA_ALIGN_BINARY or not os.path.exists(MFA_ALIGN_BINARY):
+		sys.exit("Cannot locate mfa_align binary as set by environment variable MFA_ALIGN_BINARY")
+
+	if not MFA_LEXICON or not os.path.exists(MFA_LEXICON):
+		sys.exit("Cannot locate aligner lexicon as set by environment variable MFA_LEXICON")
+
+	if not MFA_LM or not os.path.exists(MFA_LM):
+		sys.exit("Cannot locate aligner language model as set by environment variable MFA_LM")
+
 	if args.audio_path == None:
-		sys.exit("Audio file missing (-a)")
+		sys.exit("Audio file missing (-a)")	
 
-	if args.pathsfile_path == None:
-		sys.exit("Paths file missing (-p)")		
-
-	if args.recognize_audio:
+	if args.recognize_audio_google:
 		if not args.credentials_path == None:
-			recognize_audio_google(args.audio_path, args.credentials_path, args.pathsfile_path)
+			recognize_audio_google(args.audio_path, args.credentials_path)
 		else:
 			sys.exit("Specify credentials file (-c) for recognition")
-
+	elif args.recognize_audio:
+		recognize_audio_vosk()
 	elif args.process_shortaudio:
 		if not args.transcript_path == None:
-			process_transcripted_shortaudio(args.audio_path, args.transcript_path, args.pathsfile_path)
+			process_transcripted_shortaudio(args.audio_path, args.transcript_path)
 		else:
 			sys.exit("Transcript file missing (-t)")
 
@@ -62,31 +72,30 @@ def main():
 		if not args.textgrid_path == None:
 			process_segmented_longaudio("lala", "lala")
 		else:
-			sys.exit("Textgrid file missing (-t)")
+			sys.exit("Textgrid file missing (-g)")
 
-		
+	else:
+		sys.exit("Possible actions:\n--recognize_audio(-r)\n--process_shortaudio(-s)\n--process_longaudio(-l)")
+
 
 def get_recording_info(wav_in): 
 	return os.path.splitext(os.path.basename(wav_in))[0], os.path.dirname(os.path.abspath(wav_in))   
 
+def recognize_audio_vosk():
+	print("Not yet implemented")
 
-def recognize_audio_google(audio_path, credentials_json_file, paths_json_file, working_dir=DEFAULT_WORKING_DIR, segment_end_buffer=DEFAULT_SEGMENT_END_BUFFER):
+def recognize_audio_google(audio_path, credentials_json_file, working_dir=DEFAULT_WORKING_DIR, segment_end_buffer=DEFAULT_SEGMENT_END_BUFFER):
 	'''
 		Creates proscript from result of recognition. Uses Google Cloud Speech API. 
 		Not tested
 	'''
+
+	import speech_recognition as sr
 	
 	#read google cloud speech credentials
 	with open (credentials_json_file, 'r') as f: 
 		google_cloud_speech_credentials = f.read()
 
-	#read paths into memory
-	with open(paths_json_file) as f: 
-		paths = json.load(f)
-
-	mfa_align_binary = paths["MFA_ALIGN_BINARY"]
-	lexicon = paths["MFA_LEXICON"]
-	language_model = paths["MFA_LM"]
 
 	#output files
 	audio_id, audio_directory = get_recording_info(audio_path)
@@ -104,6 +113,7 @@ def recognize_audio_google(audio_path, credentials_json_file, paths_json_file, w
 		response = recognizer.recognize_google_cloud(audio, credentials_json=google_cloud_speech_credentials, show_all=True)
 	except sr.RequestError as e:
 		print("Could not request results from Google Cloud service; {0}".format(e))
+		response = None
 
 	#Convert response to proscript
 	if response:
@@ -138,9 +148,10 @@ def recognize_audio_google(audio_path, credentials_json_file, paths_json_file, w
 
 		#Run word alignment software. This will put an extra tier with word boundary information to the textgrid
 		try:
-			utils.mfa_word_align(audio_directory, mfa_align_binary=mfa_align_binary, lexicon=lexicon, language_model=language_model)
+			utils.mfa_word_align(audio_directory, mfa_align_binary=MFA_ALIGN_BINARY, lexicon=MFA_LEXICON, language_model=MFA_LM)
 			mfa_failed = False
-		except:
+		except Exception as e:
+			print(e)
 			mfa_failed = True
 
 		if not mfa_failed:
@@ -165,7 +176,7 @@ def recognize_audio_google(audio_path, credentials_json_file, paths_json_file, w
 		print("ASR cannot recognize audio")
 		return None, None
 
-def process_transcripted_shortaudio(audio_path, transcript_path, paths_json_file, working_dir=DEFAULT_WORKING_DIR):
+def process_transcripted_shortaudio(audio_path, transcript_path, working_dir=DEFAULT_WORKING_DIR):
 	'''
 		Creates proscript from a short audio of max 30s with known transcript specified in a text file. 
 		Transcription should only contain word tokens (no punctuation etc.)
@@ -175,13 +186,6 @@ def process_transcripted_shortaudio(audio_path, transcript_path, paths_json_file
 		complete_transcription = f.read()
 	print("Audio transcript: %s"%complete_transcription)
 
-	#read paths into memory
-	with open(paths_json_file) as f: 
-		paths = json.load(f)
-
-	mfa_align_binary = paths["MFA_ALIGN_BINARY"]
-	lexicon = paths["MFA_LEXICON"]
-	language_model = paths["MFA_LM"]
 
 	#output files
 	audio_id, audio_directory = get_recording_info(audio_path)
@@ -217,9 +221,10 @@ def process_transcripted_shortaudio(audio_path, transcript_path, paths_json_file
 
 	#Run word alignment software. This will put an extra tier with word boundary information to the textgrid
 	try:
-		utils.mfa_word_align(audio_directory, mfa_align_binary=mfa_align_binary, lexicon=lexicon, language_model=language_model)
+		utils.mfa_word_align(audio_directory, mfa_align_binary=MFA_ALIGN_BINARY, lexicon=MFA_LEXICON, language_model=MFA_LM)
 		mfa_failed = False
-	except:
+	except Exception as e:
+		print(e)
 		mfa_failed = True
 
 	if not mfa_failed:
@@ -243,9 +248,7 @@ def process_segmented_longaudio(audio_path, textgrid_path):
 	STUB
 	'''
 
-	p = Proscript()
-	p.id = "process_segmented_longaudio"
-	print(p.id)
+	print("Not implemented yet.")
 	
 if __name__ == '__main__':
 	main()
