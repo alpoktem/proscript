@@ -139,8 +139,7 @@ class Proscript(object):
 		self.segment_list = []
 		self.word_list = []		#same words as in segments. used for easy indexing
 		self.features_extracted = False
-		#self.word_list = []
-		self.word_feature_set = ["start_time", "end_time", "duration", "pause_before", "pause_after", "pos", "punctuation_before", "punctuation_after", "speech_rate_phon", "f0_mean", "i0_mean", "f0_range", "i0_range", "f0_contour_semitones", "i0_contour_semitones"]
+		self.word_feature_set = ["start_time", "end_time", "duration", "pause_before", "pause_after", "pos", "punctuation_before", "punctuation_after", "speech_rate_phon", "f0_mean", "i0_mean"] 
 		self.duration = -1.0
 		self.speaker_ids = []
 		self.speaker_textgrid_files = [] #textgrid file for each speaker, aligned with self.speaker_ids
@@ -229,13 +228,14 @@ class Proscript(object):
 			word_feature_set = ["id"] + self.word_feature_set
 		with open(csv_filename, 'w') as f:
 			w = csv.writer(f, delimiter=delimiter)
-			rowIds = ['word'] + segment_feature_set + word_feature_set
+			rowIds = segment_feature_set + word_feature_set + ['word'] 
 			w.writerow(rowIds)
 			for segment in self.segment_list:
 				for word in segment.word_list:
-					row = [word.word]
+					row = []
 					row += [segment.get_value(feature_id) for feature_id in segment_feature_set]
 					row += [word.get_value(feature_id) for feature_id in word_feature_set]
+					row += [word.word]
 					w.writerow(row) 
 		self.words_csv_path = csv_filename
 

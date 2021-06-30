@@ -3,7 +3,7 @@
 from setuptools import setup, find_packages
 
 setup(name='proscript',
-      version='0.41',
+      version='0.45',
       description='Proscript utilities',
       author='Alp Öktem',
       author_email='alp@collectivat.cat',

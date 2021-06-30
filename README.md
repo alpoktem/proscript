@@ -39,10 +39,10 @@ export MFA_LM=/Users/alp/extSW/montreal-forced-aligner/pretrained_models/english
 Creates proscript from a short audio of max 30s with known transcript specified in a text file. Transcription should only contain word tokens (no punctuation etc.)
 
 ```
-proscripter --process_shortaudio -a axons/sent22.wav -t sent22_transcript.txt
+proscripter --process_shortaudio -a audio.wav -t transcript.txt -o output_dir
 ```
-### Process audio using Google cloud speech recognizer
+### Process audio using Vosk speech recognizer
 
 ```
-proscripter --recognize_audio -a axons/sent22.wav
+proscripter --recognize_audio -a audio.wav -o output_dir
 ```

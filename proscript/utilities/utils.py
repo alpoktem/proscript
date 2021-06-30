@@ -9,6 +9,7 @@ import re
 import csv
 import json
 import math
+import shutil
 from proscript import Word
 from proscript import Proscript
 from proscript import Segment
@@ -191,6 +192,19 @@ def find_file(name, extension, path):
 			return os.path.join(root, filename)
 	return None
 
+def mfa_word_align_audio_and_textgrid(audio_path, textgrid_path, mfa_align_binary, lexicon, language_model):
+	if os.path.splitext(os.path.basename(textgrid_path))[0] == os.path.splitext(os.path.basename(audio_path))[0] and os.path.dirname(textgrid_path) == os.path.dirname(audio_path):
+	    print("Found TextGrid besides audio", os.path.basename(textgrid_path))
+	    out_textgrid_path = textgrid_path
+	else:
+	    out_textgrid_path = os.path.splitext(audio_path)[0] + ".TextGrid"
+	    print("Creating", out_textgrid_path)
+	    shutil.copyfile(textgrid_path, out_textgrid_path)
+
+	working_dir = os.path.dirname(audio_path)
+	mfa_word_align(working_dir, "TextGrid", True, mfa_align_binary, lexicon, language_model)
+	return out_textgrid_path
+
 #Creates word/phoneme alignments in the textgrids in the input_textgrid_directory using Montreal Forced Aligner. 
 #Requirement: Input textgrids are already segmented into max 30 second intervals.
 #Warning: Replaces the input textgrids with word aligned textgrids.
@@ -349,7 +363,6 @@ def readTedDataToMemory(word_id_list, file_wordalign=None, file_wordaggs_f0=None
 							elif row_count == 6:
 								line_type = 1	
 
-	print("=========love=========")
 
 	return [word_id_to_f0_features_dic, word_id_to_i0_features_dic, word_data_aligned_dic, word_id_to_raw_f0_features_dic, word_id_to_raw_i0_features_dic]
 
@@ -362,6 +375,9 @@ def get_word_features_from_textgrid(proscript, word_tier_no=1, remove_textgrid=F
 	elif proscript.textgrid_file:
 		segment_lists = [proscript.segment_list]
 		textgrid_files = [proscript.textgrid_file]
+	else:
+		print("ERROR: textgrid_file or speaker_textgrid_files not set on proscript")
+		return
 
 	for textgrid_file, segment_list in zip(textgrid_files, segment_lists):
 		if prosody_tag:
@@ -370,7 +386,6 @@ def get_word_features_from_textgrid(proscript, word_tier_no=1, remove_textgrid=F
 			call_prosody_tagger(praat_binary, file_id, working_dir)
 
 		textgrid = tgio.openTextgrid(textgrid_file)		#word segmented textgrid with three tiers, segment, word, phoneme
-		#print(textgrid.tierNameList[word_tier_no])
 		textgrid_wordtier = textgrid.tierDict[textgrid.tierNameList[word_tier_no]]
 		prev_segment = None
 		for segment in segment_list:
