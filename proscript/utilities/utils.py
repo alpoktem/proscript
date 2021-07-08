@@ -366,7 +366,9 @@ def readTedDataToMemory(word_id_list, file_wordalign=None, file_wordaggs_f0=None
 
 	return [word_id_to_f0_features_dic, word_id_to_i0_features_dic, word_data_aligned_dic, word_id_to_raw_f0_features_dic, word_id_to_raw_i0_features_dic]
 
+
 #reads word alignment information and acoustic metadata from textgrid to proscript. 
+#assumes segment information is already in the proscript
 #punctuation information is filled wrt transcript info in segments
 def get_word_features_from_textgrid(proscript, word_tier_no=1, remove_textgrid=False, prosody_tag=False, praat_binary='praat'):
 	if proscript.speaker_textgrid_files:

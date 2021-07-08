@@ -39,10 +39,25 @@ export MFA_LM=/Users/alp/extSW/montreal-forced-aligner/pretrained_models/english
 Creates proscript from a short audio of max 30s with known transcript specified in a text file. Transcription should only contain word tokens (no punctuation etc.)
 
 ```
-proscripter --process_shortaudio -a audio.wav -t transcript.txt -o output_dir
+proscripter --short -a audio.wav -t transcript.txt -o output_dir
 ```
-### Process audio using Vosk speech recognizer
+
+### Process audio with segmented textgrid
+
+Creates proscript from an audio with a segmented transcript specified in a TextGrid file. 
 
 ```
-proscripter --recognize_audio -a audio.wav -o output_dir
+proscripter --long -a audio.wav -t audio.TextGrid -o output_dir
+```
+
+### Process audio using Vosk speech recognizer
+
+Set environment variable for the Vosk model you want to use
+
+```
+export VOSK_MODEL=/Users/alp/Documents/TWB/play/apicilik/Gamayun-API/asr-api/models/vosk-model-small-en-us-0.15
+```
+
+```
+proscripter --recognize -a audio.wav -o output_dir
 ```
