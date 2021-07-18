@@ -32,7 +32,7 @@ export MFA_LEXICON=montreal-forced-aligner-path/pretrained_models/en.dict
 export MFA_LM=montreal-forced-aligner-path/pretrained_models/english.zip
 ```
 
-## Usage
+## Endpoint usage
 
 ### Process short audio with transcription
 
@@ -52,7 +52,9 @@ proscripter --long -a audio.wav -t audio.TextGrid -o output_dir
 
 ### Process audio using Vosk speech recognizer
 
-Set environment variable for the Vosk model you want to use
+Does automatic speech recognition and then creates a proscript of it. 
+
+Set environment variable for the Vosk model you want to use by:
 
 ```
 export VOSK_MODEL=vosk-model-path
@@ -60,4 +62,31 @@ export VOSK_MODEL=vosk-model-path
 
 ```
 proscripter --recognize -a audio.wav -o output_dir
+```
+
+## Library usage
+
+Refer to `proscript/scripts.py` to see examples of creating proscript files. 
+
+Reading a proscript file in python:
+
+```
+from proscript import Proscript
+
+p = Proscript()
+p.from_file(csv_filename='my_proscript.csv', proscript_id="my_proscript", audio_file="my_audio.wav", delimiter="|")
+```
+
+## Libraries that use Proscript
+
+- [Movie2parallelDB](https://github.com/alpoktem/movie2parallelDB) makes sentence aligned proscripts from subtitled and dubbed movies.
+- [Prosograph](https://github.com/alpoktem/Prosograph) lets visualize proscripts.
+- [PunkProse](https://github.com/alpoktem/punkProse) generates punctuation for speech transcripts using lexical, syntactic and prosodic features stored in proscript files.
+
+## Citation
+
+If you use this library, please cite the following paper:
+
+```
+Alp Öktem, Mireia Farrús, Antonio Bonafonte. Corpora Compilation for Prosody-informed Speech Processing. Lang Resources & Evaluation (Accepted). 
 ```
