@@ -75,7 +75,11 @@ def get_recording_info(wav_in):
     return os.path.splitext(os.path.basename(wav_in))[0], os.path.dirname(os.path.abspath(wav_in))   
 
 '''
-TODO: Explanation
+--recognize
+Given audio file with speech, performs ASR and creates proscript file. 
+Outputs transcript and proscript.
+Depends on vosk-api
+Environment variable VOSK_MODEL needs to be set to directory of the vosk ASR model 
 '''
 def recognize_audio_vosk(audio_path, output_dir):
     from vosk_transcribe import get_recognition
@@ -146,13 +150,13 @@ def recognize_audio_vosk(audio_path, output_dir):
             return None
 
 '''
-TODO: Explanation
+--short
+Creates proscript from a short audio of max 30s with known transcript specified in a text file. 
+Transcription should only contain word tokens (no punctuation etc.)
+Outputs proscript
 '''
 def process_transcripted_shortaudio(audio_path, transcript_path, working_dir=DEFAULT_WORKING_DIR):
-    '''
-        Creates proscript from a short audio of max 30s with known transcript specified in a text file. 
-        Transcription should only contain word tokens (no punctuation etc.)
-    '''
+
     #read transcript into memory
     with open(transcript_path, 'r') as f:
         complete_transcription = f.read()
@@ -210,7 +214,10 @@ def process_transcripted_shortaudio(audio_path, transcript_path, working_dir=DEF
         return None, None
 
 '''
-TODO: Explanation
+--long
+Creates a proscript from an audio file with textgrid. 
+Textgrid needs to contain sentence boundaries marked.
+Outputs proscript
 '''
 def process_segmented_longaudio(audio_path, textgrid_path, working_dir=DEFAULT_WORKING_DIR):
     audio_id, audio_directory = get_recording_info(audio_path)
