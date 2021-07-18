@@ -4,7 +4,7 @@ A Python package for creating proscript files. Proscript helps represent speech 
 
 ## System dependencies
 
-Proscript is developed and tested on a MacOS with Python 3+. Speech recognition feature only works in Linux. 
+Proscript is developed and tested on a MacOS with Python 3+. 
 
 Proscript depends on the following libraries:
 
@@ -25,11 +25,11 @@ cd proscript
 pip install .
 ```
 
-3- Install Montreal Forced aligner and make sure environment variables are set for locating binaries and models for Montreal Forced Aligner
+3- Install Montreal Forced aligner and set the following environment variables for the scripts to locate binaries and models of Montreal Forced Aligner
 ```
-export MFA_ALIGN_BINARY=/Users/alp/extSW/montreal-forced-aligner/bin/mfa_align
-export MFA_LEXICON=/Users/alp/extSW/montreal-forced-aligner/pretrained_models/en.dict
-export MFA_LM=/Users/alp/extSW/montreal-forced-aligner/pretrained_models/english.zip
+export MFA_ALIGN_BINARY=montreal-forced-aligner-path/bin/mfa_align
+export MFA_LEXICON=montreal-forced-aligner-path/pretrained_models/en.dict
+export MFA_LM=montreal-forced-aligner-path/pretrained_models/english.zip
 ```
 
 ## Usage
@@ -55,7 +55,7 @@ proscripter --long -a audio.wav -t audio.TextGrid -o output_dir
 Set environment variable for the Vosk model you want to use
 
 ```
-export VOSK_MODEL=/Users/alp/Documents/TWB/play/apicilik/Gamayun-API/asr-api/models/vosk-model-small-en-us-0.15
+export VOSK_MODEL=vosk-model-path
 ```
 
 ```
