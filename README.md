@@ -83,6 +83,11 @@ p.from_file(csv_filename='my_proscript.csv', proscript_id="my_proscript", audio_
 - [Prosograph](https://github.com/alpoktem/Prosograph) lets visualize proscripts.
 - [PunkProse](https://github.com/alpoktem/punkProse) generates punctuation for speech transcripts using lexical, syntactic and prosodic features stored in proscript files.
 
+## Corpora that use Proscript
+
+- [PANTED corpus](http://hdl.handle.net/10230/33981) - 250 hour speech corpus from TED talks
+- [Heroes corpus](http://hdl.handle.net/10230/35572) - Parallel English-Spanish speech corpus of dubbed movie segments
+
 ## Citation
 
 If you use this library, please cite the following paper:
