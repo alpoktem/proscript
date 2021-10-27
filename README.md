@@ -93,5 +93,8 @@ p.from_file(csv_filename='my_proscript.csv', proscript_id="my_proscript", audio_
 If you use this library, please cite the following paper:
 
 ```
-Alp Öktem, Mireia Farrús, Antonio Bonafonte. Corpora Compilation for Prosody-informed Speech Processing. Lang Resources & Evaluation (Accepted). 
+Öktem, A., Farrús, M. & Bonafonte, A. 
+Corpora compilation for prosody-informed speech processing.
+Lang Resources & Evaluation 55, 925–946 (2021). 
+https://doi.org/10.1007/s10579-021-09556-2
 ```
